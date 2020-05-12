@@ -47,7 +47,24 @@ def exractDigits(images,labels):
     sevenToNineLabels = labels[sevenToNineIdx[0]]
     sevenToNineImages = images[sevenToNineIdx[0]]
     return [zeroToSixImages,zeroToSixLabels,sevenToNineImages,sevenToNineLabels]
-im0,lbl0,im7,lbl7 = exractDigits(images.numpy(),labels.numpy())
+
+def printParameters():
+    for name, param in model.named_parameters():
+        print('name: ', name)
+        print(type(param))
+        print('param.shape: ', param.shape)
+        print('param.requires_grad: ', param.requires_grad)
+        print('=====')
+def freezeFirstLayer():
+    for name,param in model.named_parameters():
+        if name in ['fc1.weight','fc1.bias']:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+def initThirdLayer():
+    for name,param in model.named_parameters():
+        if name in ['fc3.weight','fc3.bias']:
+            torch.nn.init.xavier_uniform(param)
 class Net(nn.Module):
     def __init__(self, D, H1, H2, Classes):
         super(Net, self).__init__()
@@ -70,11 +87,12 @@ class Net(nn.Module):
         x = F.relu(x)
         x = self.dropout2(x)
         x = self.fc3(x)
-        return F.log_softmax(x)
+        return F.log_softmax(x,dim=1)
 
 
 torch.manual_seed(42)
-model = Net(D=input_size, H1=128, H2=64, Classes=10)
+model = Net(D=input_size, H1=128, H2=64, Classes=7)
+
 model.train()
 
 criterion = nn.NLLLoss()
@@ -83,17 +101,19 @@ criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters())
 
 time0 = time()
+
 for e in range(EPOCHS):
     running_loss = 0
     for images, labels in trainloader:
+        images06,labels06,images79,labels79 = exractDigits(images,labels)
         # Flatten MNIST images into a 784 long vector
-        images = images.view(images.shape[0], -1)
+        images06 = images06.view(images06.shape[0], -1)
     
         # Training pass
         optimizer.zero_grad()
         
-        output = model(images)
-        loss = criterion(output, labels)
+        output = model(images06)
+        loss = criterion(output, labels06)
         
         #This is where the model learns by backpropagating
         loss.backward()
@@ -111,8 +131,9 @@ print("\nTraining Time (in minutes) =",(time()-time0)/60)
 model.eval()
 correct_count, all_count = 0, 0
 for images,labels in valloader:
-  for i in range(len(labels)):
-    img = images[i].view(1, 784)
+  images06,labels06,images79,labels79 = exractDigits(images,labels)  
+  for i in range(len(labels06)):
+    img = images06[i].view(1, 784)
     with torch.no_grad():
         logps = model(img)
 
@@ -120,7 +141,7 @@ for images,labels in valloader:
     ps = torch.exp(logps)
     probab = list(ps.numpy()[0])
     pred_label = probab.index(max(probab))
-    true_label = labels.numpy()[i]
+    true_label = labels06.numpy()[i]
     if(true_label == pred_label):
       correct_count += 1
     all_count += 1
