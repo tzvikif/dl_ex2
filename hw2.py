@@ -100,44 +100,21 @@ def singleEpoch(model,optimizer,criterion,trainSet,valSet,e):
         optimizer.step()
         
         running_loss += loss.item()
-    print("Epoch {} - Training loss: {}".format(e, running_loss/len(trainloader)))
-    print("\nTraining Time (in minutes) =",(time()-time0)/60)
-
+    val_batch_cnt = 0
+    val_running_loss = 0
+    for val_batch_idx ,(val_images, val_labels) in enumerate(valSet):
+            val_images = val_images.view(val_images.shape[0], -1)
+            val_output = model(val_images)
+            val_loss = criterion(val_output, val_labels)
+            val_running_loss+= val_loss.item()
+            val_batch_cnt+=1
+            if(val_batch_idx==5):
+                break
+    print("Epoch {} - Training loss: {}".format(e, running_loss/len(trainSet)))
+    print("Test loss: {}".format(val_running_loss/val_batch_cnt))
 torch.manual_seed(42)
 model = Net(D=input_size, H1=128, H2=64, Classes=10)
-model.train()
-
-criterion = nn.NLLLoss()
-
-#optimizer = optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
-optimizer = optim.Adam(model.parameters())
-
-time0 = time()
-for e in range(EPOCHS):
-    running_loss = 0
-    for images, labels in trainloader_0t6:
-        # Flatten MNIST images into a 784 long vector
-        images = images.view(images.shape[0], -1)
-    
-        # Training pass
-        optimizer.zero_grad()
-        
-        output = model(images)
-        loss = criterion(output, labels)
-        
-        #This is where the model learns by backpropagating
-        loss.backward()
-        
-        #And optimizes its weights here
-        optimizer.step()
-        
-        running_loss += loss.item()
-    else:
-        print("Epoch {} - Training loss: {}".format(e, running_loss/len(trainloader_0t6)))
-print("\nTraining Time (in minutes) =",(time()-time0)/60)
-
-
-
+trainModel(model,trainloader_0t6,valloader_0t6)
 model.eval()
 correct_count, all_count = 0, 0
 for images,labels in valloader_0t6:
