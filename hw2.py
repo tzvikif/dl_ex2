@@ -8,10 +8,10 @@ from torch import nn, optim
 import torch.nn.functional as F
 
 SHOW_SAMPLES=False
-LOAD_WEIGHTS = True
+LOAD_WEIGHTS = transforms
 SAVE_WEIGHTS = False
-EPOCHS = 5
-
+EPOCHS = 8
+PATH = '/Users/tzvikif/Documents/Msc/Deep Learning/Excercises/ex_2/'
 transform = transforms.Compose([transforms.ToTensor(),
                               transforms.Normalize((0.5,), (0.5,)),
                               ])
@@ -27,21 +27,18 @@ valloader_0t6 = torch.utils.data.DataLoader(valset_0t6, batch_size=64, shuffle=T
 
 trainset_7t9 = datasets.MNIST('PATH_TO_STORE_TRAINSET', download=True, train=True, transform=transform)
 valset_7t9 = datasets.MNIST('PATH_TO_STORE_TESTSET', download=True, train=False, transform=transform)
-trainset_7t9.data = trainset_7t9.data[trainset_7t9.targets < 7]
-trainset_7t9.targets = trainset_7t9.targets[trainset_7t9.targets < 7]
-valset_7t9.data = valset_7t9.data[valset_7t9.targets < 7]
-valset_7t9.targets = valset_7t9.targets[valset_7t9.targets < 7]
+trainset_7t9.data = trainset_7t9.data[trainset_7t9.targets > 6]
+trainset_7t9.targets = trainset_7t9.targets[trainset_7t9.targets > 6]
+valset_7t9.data = valset_7t9.data[valset_7t9.targets > 6]
+valset_7t9.targets = valset_7t9.targets[valset_7t9.targets > 6]
 trainloader_7t9 = torch.utils.data.DataLoader(trainset_7t9, batch_size=64, shuffle=True)
 valloader_7t9 = torch.utils.data.DataLoader(valset_7t9, batch_size=64, shuffle=True)
 
-
-dataiter = iter(trainloader_0t6)
-images, labels = dataiter.next()
-
-print(images.shape)
-print(labels.shape)
-
-if (SHOW_SAMPLES):
+# image size is 28x28
+input_size = 784
+def showSamples(loader):
+    dataiter = iter(loader)
+    images, labels = dataiter.next()
     plt.imshow(images[0].numpy().squeeze(), cmap='gray_r')
     figure = plt.figure()
     num_of_images = 60
@@ -50,12 +47,6 @@ if (SHOW_SAMPLES):
         plt.axis('off')
         plt.imshow(images[index].numpy().squeeze(), cmap='gray_r')
     plt.show()
-
-# image size is 28x28
-input_size = 784
-
-
-
 class Net(nn.Module):
     def __init__(self, D, H1, H2, Classes):
         super(Net, self).__init__()
@@ -80,7 +71,7 @@ class Net(nn.Module):
         x = self.fc3(x)
         return F.log_softmax(x,dim=1)
 
-def trainModel(model,trainloader,valSet):
+def trainModel(model,trainloader,valloader):
     model.train()
     criterion = nn.NLLLoss()
     #optimizer = optim.SGD(model.parameters(), lr=0.003, momentum=0.9)
@@ -89,7 +80,7 @@ def trainModel(model,trainloader,valSet):
     train_losses = list()
     test_losses = list()
     for e in range(EPOCHS):
-        train_loss,test_loss = singleEpoch(model,optimizer,criterion,trainloader_0t6,valloader_0t6,e)
+        train_loss,test_loss = singleEpoch(model,optimizer,criterion,trainloader,valloader,e)
         train_losses.append(train_loss)
         test_losses.append(test_loss)
     return train_losses,test_losses
@@ -157,10 +148,10 @@ def testModel(model,valSet):
             all_count += 1
     print("Number Of Images Tested =", all_count)
     print("\nModel Accuracy =", (correct_count/all_count))
-def saveWeights(model,path='weights_only.pth'):
-    torch.save(model.state_dict(),path)
-def loadWeights(new_model,path='weights_only.pth'):
-    new_model.load_state_dict(torch.load(path))
+def saveWeights(model,filename):
+    torch.save(model.state_dict(),PATH+filename)
+def loadWeights(new_model,filename):
+    new_model.load_state_dict(torch.load(PATH + filename))
     return new_model
 def freezeFirstLayer(model):
     for name,param in model.named_parameters():
@@ -172,36 +163,40 @@ def initThirdLayer(model):
     for name,param in model.named_parameters():
         if name in ['fc3.weight']:
             nn.init.xavier_uniform_(param)
+#showSamples(valloader_7t9)
 torch.manual_seed(42)
 model = Net(D=input_size, H1=128, H2=64, Classes=10)
 if(LOAD_WEIGHTS):
-    model = loadWeights(model)
+    model = loadWeights(model,'weights_0t6.pth')
 else:
     train_losses,test_losses = trainModel(model,trainloader_0t6,valloader_0t6)
+    saveWeights(model,'weights_0t6.pth')
     x = np.arange(1,len(train_losses)+1)
     dtrainLosses = {'x':x,'y':train_losses,'funcName':'Train losses'}
     dtestLosses = {'x':x,'y':test_losses,'funcName':'Test losses'}
-    Multiplot([dtrainLosses,dtestLosses],'#Epochs','Accuracy',title='Loss')
+    #Multiplot([dtrainLosses,dtestLosses],'#Epochs','Accuracy',title='Loss')
 if(SAVE_WEIGHTS):
-    saveWeights(model)
+    saveWeights(model,'weights_7t9.pth')
 testModel(model,valloader_0t6)
 print('freeze 1st layer. Initialize 3rd layer')
 if(LOAD_WEIGHTS):
-    loadWeights(model,path='weights_7t9.pth')
+    loadWeights(model,filename='weights_7t9.pth')
 else:
     freezeFirstLayer(model)
     initThirdLayer(model)
     train_losses,test_losses = trainModel(model,trainloader_7t9,valloader_7t9)
+    #saveWeights(model,filename='weights_7t9.pth')
     x = np.arange(1,len(train_losses)+1)
     dtrainLosses = {'x':x,'y':train_losses,'funcName':'Train losses'}
     dtestLosses = {'x':x,'y':test_losses,'funcName':'Test losses'}
-    Multiplot([dtrainLosses,dtestLosses],'#Epochs','Accuracy',title='Seven to nine loss')
+    #Multiplot([dtrainLosses,dtestLosses],'#Epochs','Accuracy',title='Seven to nine loss')
 testModel(model,valloader_7t9)
+
 print('new model')
 model = Net(D=input_size, H1=128, H2=64, Classes=10)
 if(LOAD_WEIGHTS):
     loadWeights(model,'new_weights_7t9.pth')    
 else:
     train_losses,test_losses = trainModel(model,trainloader_7t9,valloader_7t9)
-#saveWeights(model,path='new_weights_7t9.pth')
+    #saveWeights(model,filename  ='new_weights_7t9.pth')
 testModel(model,valloader_7t9)
