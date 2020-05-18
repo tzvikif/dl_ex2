@@ -8,7 +8,7 @@ from torch import nn, optim
 import torch.nn.functional as F
 
 SHOW_SAMPLES=False
-LOAD_WEIGHTS = False
+LOAD_WEIGHTS = True
 SAVE_WEIGHTS = False
 EPOCHS = 5
 
@@ -24,6 +24,15 @@ valset_0t6.data = valset_0t6.data[valset_0t6.targets < 7]
 valset_0t6.targets = valset_0t6.targets[valset_0t6.targets < 7]
 trainloader_0t6 = torch.utils.data.DataLoader(trainset_0t6, batch_size=64, shuffle=True)
 valloader_0t6 = torch.utils.data.DataLoader(valset_0t6, batch_size=64, shuffle=True)
+
+trainset_7t9 = datasets.MNIST('PATH_TO_STORE_TRAINSET', download=True, train=True, transform=transform)
+valset_7t9 = datasets.MNIST('PATH_TO_STORE_TESTSET', download=True, train=False, transform=transform)
+trainset_7t9.data = trainset_7t9.data[trainset_7t9.targets < 7]
+trainset_7t9.targets = trainset_7t9.targets[trainset_7t9.targets < 7]
+valset_7t9.data = valset_7t9.data[valset_7t9.targets < 7]
+valset_7t9.targets = valset_7t9.targets[valset_7t9.targets < 7]
+trainloader_7t9 = torch.utils.data.DataLoader(trainset_7t9, batch_size=64, shuffle=True)
+valloader_7t9 = torch.utils.data.DataLoader(valset_7t9, batch_size=64, shuffle=True)
 
 
 dataiter = iter(trainloader_0t6)
@@ -153,6 +162,16 @@ def saveWeights(model,path='weights_only.pth'):
 def loadWeights(new_model,path='weights_only.pth'):
     new_model.load_state_dict(torch.load(path))
     return new_model
+def freezeFirstLayer(model):
+    for name,param in model.named_parameters():
+        if name in ['fc1.weight','fc1.bias']:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+def initThirdLayer(model):
+    for name,param in model.named_parameters():
+        if name in ['fc3.weight']:
+            nn.init.xavier_uniform_(param)
 torch.manual_seed(42)
 model = Net(D=input_size, H1=128, H2=64, Classes=10)
 if(LOAD_WEIGHTS):
@@ -166,3 +185,23 @@ else:
 if(SAVE_WEIGHTS):
     saveWeights(model)
 testModel(model,valloader_0t6)
+print('freeze 1st layer. Initialize 3rd layer')
+if(LOAD_WEIGHTS):
+    loadWeights(model,path='weights_7t9.pth')
+else:
+    freezeFirstLayer(model)
+    initThirdLayer(model)
+    train_losses,test_losses = trainModel(model,trainloader_7t9,valloader_7t9)
+    x = np.arange(1,len(train_losses)+1)
+    dtrainLosses = {'x':x,'y':train_losses,'funcName':'Train losses'}
+    dtestLosses = {'x':x,'y':test_losses,'funcName':'Test losses'}
+    Multiplot([dtrainLosses,dtestLosses],'#Epochs','Accuracy',title='Seven to nine loss')
+testModel(model,valloader_7t9)
+print('new model')
+model = Net(D=input_size, H1=128, H2=64, Classes=10)
+if(LOAD_WEIGHTS):
+    loadWeights(model,'new_weights_7t9.pth')    
+else:
+    train_losses,test_losses = trainModel(model,trainloader_7t9,valloader_7t9)
+#saveWeights(model,path='new_weights_7t9.pth')
+testModel(model,valloader_7t9)
