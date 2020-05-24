@@ -18,10 +18,10 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 SHOW_SAMPLES=False
-LOAD_WEIGHTS_MODEL1 = True
+LOAD_WEIGHTS_MODEL1 = False
 LOAD_WEIGHTS_MODEL2 = False
 SAVE_WEIGHTS_MODEL1 = False
-SAVE_WEIGHTS_MODEL2 = True
+SAVE_WEIGHTS_MODEL2 = False
 MODEL1_NAME = 'model1.pth'
 MODEL2_NAME = 'model2.pth'
 PATH = '/Users/tzvikif/Documents/Msc/Deep Learning/Excercises/ex_2/'
@@ -118,20 +118,24 @@ def Main():
     network = Net()
     train_losses = []
     test_losses = []
-    #optimizer = optim.SGD(network.parameters(), lr=learning_rate,momentum=momentum)
     optimizer = optim.Adam(network.parameters())
     test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
     train_counter = []
+    total_training_time = 0
     print('0-6')
     if(not LOAD_WEIGHTS_MODEL1):
         test_loss = test(network,valloader_0t6)
         test_losses.append(test_loss)
         for epoch in range(1, n_epochs + 1):
+            time0 = time()
             train_loss,tc = train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+            total_training_time = total_training_time + time() - time0
+            time0 = time()
             train_losses.append(train_loss)
             train_counter.append(tc)
             test_loss = test(network,valloader_0t6)
             test_losses.append(test_loss)
+        print(f'total training time:{total_training_time:.2f}')
         saveWeights(network,PATH+MODEL1_NAME)
         train_losses = np.concatenate(train_losses,axis=0)
         train_counter = np.concatenate(train_counter,axis=0)
@@ -146,16 +150,21 @@ def Main():
     test_loss = test(network,valloader_7t9)
     test_counter = [i*len(trainloader_7t9.dataset) for i in range(n_epochs + 1)]
     test_losses.append(test_loss)
+    total_training_time = 0
     if(not LOAD_WEIGHTS_MODEL2):
         freezeFirstLayer(network)
         initThirdLayer(network)
         test(network,valloader_7t9)
         for epoch in range(1, n_epochs + 1):
-           train_loss,tc = train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
-           train_losses.append(train_loss)
-           train_counter.append(tc)
-           test_loss = test(network,valloader_7t9)
-           test_losses.append(test_loss)
+            time0 = time()
+            train_loss,tc = train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+            total_training_time = total_training_time + time() - time0
+            time0 = time()
+            train_losses.append(train_loss)
+            train_counter.append(tc)
+            test_loss = test(network,valloader_7t9)
+            test_losses.append(test_loss)
+        print(f'total training time:{total_training_time:.2f}')
         saveWeights(network,PATH+MODEL2_NAME)
         train_losses = np.concatenate(train_losses,axis=0)
         train_counter = np.concatenate(train_counter,axis=0)
@@ -171,12 +180,17 @@ def Main():
     test_losses = []
     test_loss = test(network,valloader_7t9)
     test_losses.append(test_loss)
+    total_training_time = 0
     for epoch in range(1, n_epochs + 1):
+        time0 = time()
         train_loss,tc = train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+        total_training_time = total_training_time + time() - time0
+        time0 = time()
         train_losses.append(train_loss)
         train_counter.append(tc)
         test_loss = test(network,valloader_7t9)
         test_losses.append(test_loss)
+    print(f'total training time:{total_training_time:.2f}')
     train_losses = np.concatenate(train_losses,axis=0)
     train_counter = np.concatenate(train_counter,axis=0)
     myPlot(train_losses,train_counter,test_losses,test_counter)
