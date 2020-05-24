@@ -18,10 +18,10 @@ random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 SHOW_SAMPLES=False
-LOAD_WEIGHTS_MODEL1 = False
+LOAD_WEIGHTS_MODEL1 = True
 LOAD_WEIGHTS_MODEL2 = False
 SAVE_WEIGHTS_MODEL1 = False
-SAVE_WEIGHTS_MODEL2 = False
+SAVE_WEIGHTS_MODEL2 = True
 MODEL1_NAME = 'model1.pth'
 MODEL2_NAME = 'model2.pth'
 PATH = '/Users/tzvikif/Documents/Msc/Deep Learning/Excercises/ex_2/'
@@ -53,10 +53,9 @@ valset_7t9.targets = valset_7t9.targets[valset_7t9.targets > 6]
 trainloader_7t9 = torch.utils.data.DataLoader(trainset_7t9, batch_size=64, shuffle=True)
 valloader_7t9 = torch.utils.data.DataLoader(valset_7t9, batch_size=64, shuffle=True)
 
-
-examples = enumerate(valloader_0t6)
-batch_idx, (example_data, example_targets) = next(examples)
-if(SHOW_SAMPLES):
+def showExamples(loader):
+    examples = enumerate(loader)
+    batch_idx, (example_data, example_targets) = next(examples)
     fig = plt.figure()
     for i in range(6):
         plt.subplot(2,3,i+1)
@@ -77,6 +76,14 @@ def Multiplot(l,xlabel,ylabel,title=''):
         plt.legend()
         plt.title(title)
         plt.plot()
+    plt.show()
+def myPlot(train_losses,train_counter,test_losses,test_counter):
+    fig = plt.figure()
+    plt.plot(train_counter, train_losses, color='blue')
+    plt.scatter(test_counter, test_losses, color='red')
+    plt.legend(['Train Loss', 'Test Loss'], loc='upper right')
+    plt.xlabel('number of training examples seen')
+    plt.ylabel('negative log likelihood loss')
     plt.show()
 def freezeFirstLayer(model):
     for name,param in model.named_parameters():
@@ -106,40 +113,73 @@ class Net(nn.Module):
         x = self.fc2(x)
         return F.log_softmax(x,dim=1)
 def Main():
+    if(SHOW_SAMPLES):
+        showExamples(trainloader_0t6)
     network = Net()
     train_losses = []
     test_losses = []
     #optimizer = optim.SGD(network.parameters(), lr=learning_rate,momentum=momentum)
     optimizer = optim.Adam(network.parameters())
-    #test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
+    test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
+    train_counter = []
     print('0-6')
     if(not LOAD_WEIGHTS_MODEL1):
-        test(network,valloader_0t6)
+        test_loss = test(network,valloader_0t6)
+        test_losses.append(test_loss)
         for epoch in range(1, n_epochs + 1):
-            train_loss = train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+            train_loss,tc = train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+            train_losses.append(train_loss)
+            train_counter.append(tc)
             test_loss = test(network,valloader_0t6)
+            test_losses.append(test_loss)
         saveWeights(network,PATH+MODEL1_NAME)
+        train_losses = np.concatenate(train_losses,axis=0)
+        train_counter = np.concatenate(train_counter,axis=0)
+        myPlot(train_losses,train_counter,test_losses,test_counter)
     else:
         network = loadWeights(network,PATH+MODEL1_NAME)
     test(network,valloader_0t6)
     print('7-9')
+    train_counter = []
+    train_losses = []
+    test_losses = []
+    test_loss = test(network,valloader_7t9)
+    test_counter = [i*len(trainloader_7t9.dataset) for i in range(n_epochs + 1)]
+    test_losses.append(test_loss)
     if(not LOAD_WEIGHTS_MODEL2):
         freezeFirstLayer(network)
         initThirdLayer(network)
         test(network,valloader_7t9)
         for epoch in range(1, n_epochs + 1):
-            train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
-            test(network,valloader_7t9)
+           train_loss,tc = train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+           train_losses.append(train_loss)
+           train_counter.append(tc)
+           test_loss = test(network,valloader_7t9)
+           test_losses.append(test_loss)
         saveWeights(network,PATH+MODEL2_NAME)
+        train_losses = np.concatenate(train_losses,axis=0)
+        train_counter = np.concatenate(train_counter,axis=0)
+        myPlot(train_losses,train_counter,test_losses,test_counter)
     else:
         network = loadWeights(network,PATH+MODEL2_NAME)
     test(network,valloader_7t9)
     print('7-9 new weights')
     network = Net()
+    optimizer = optim.Adam(network.parameters())
+    train_counter = []
+    train_losses = []
+    test_losses = []
+    test_loss = test(network,valloader_7t9)
+    test_losses.append(test_loss)
     for epoch in range(1, n_epochs + 1):
-        train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
-        test(network,valloader_7t9)
-    saveWeights(network,PATH+MODEL2_NAME)
+        train_loss,tc = train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+        train_losses.append(train_loss)
+        train_counter.append(tc)
+        test_loss = test(network,valloader_7t9)
+        test_losses.append(test_loss)
+    train_losses = np.concatenate(train_losses,axis=0)
+    train_counter = np.concatenate(train_counter,axis=0)
+    myPlot(train_losses,train_counter,test_losses,test_counter)
     test(network,valloader_7t9)
 def train(network,optimizer,epoch,trainloader,valloader):
     network.train()
@@ -156,7 +196,8 @@ def train(network,optimizer,epoch,trainloader,valloader):
                 epoch, batch_idx * len(data), len(trainloader.dataset),
                 100. * batch_idx / len(trainloader), loss.item()))
             train_losses.append(loss.item())
-    return train_losses
+            train_counter.append((batch_idx*64) + ((epoch-1)*len(trainloader.dataset)))
+    return train_losses,train_counter
       #train_counter.append(
       #  (batch_idx*64) + ((epoch-1)*len(trainloader.dataset)))
       #torch.save(optimizer.state_dict(), 'optimizer.pth')
@@ -164,7 +205,6 @@ def test(network,testloader):
     network.eval()
     test_loss = 0
     correct = 0
-    test_losses = []
     with torch.no_grad():
         for data, target in testloader:
             output = network(data)
@@ -172,9 +212,8 @@ def test(network,testloader):
             pred = output.data.max(1, keepdim=True)[1]  #shape=[13,1]
             correct += torch.sum(pred.eq(target.data.view_as(pred)),dim=0)
         test_loss /= len(testloader.dataset)
-        test_losses.append(test_loss)
         print(f'\nTest set: Avg. loss: {test_loss}, Accuracy: {correct}/{len(testloader.dataset)} ({100. * correct / len(testloader.dataset)}%')
-    return test_losses
+    return test_loss
 def loadWeights(new_model,path):
     new_model.load_state_dict(torch.load(path))
     return new_model
