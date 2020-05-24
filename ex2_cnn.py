@@ -10,16 +10,21 @@ import torch.nn.functional as F
 n_epochs = 3
 batch_size_train = 64
 batch_size_test = 1000
-learning_rate = 0.01
-momentum = 0.5
+#learning_rate = 0.01
+#momentum = 0.5
 log_interval = 10
 
 random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
 SHOW_SAMPLES=False
-LOAD_WEIGHTS = False
-SAVE_WEIGHTS = False
+LOAD_WEIGHTS_MODEL1 = False
+LOAD_WEIGHTS_MODEL2 = False
+SAVE_WEIGHTS_MODEL1 = False
+SAVE_WEIGHTS_MODEL2 = False
+MODEL1_NAME = 'model1.pth'
+MODEL2_NAME = 'model2.pth'
+PATH = '/Users/tzvikif/Documents/Msc/Deep Learning/Excercises/ex_2/'
 '''
 train_loader = torch.utils.data.DataLoader(
   torchvision.datasets.MNIST('PATH_TO_STORE_TRAINSET', train=True, download=True,transform=torchvision.transforms.Compose([torchvision.transforms.ToTensor(),torchvision.transforms.Normalize((0.1307,), (0.3081,))])),batch_size=batch_size_train, shuffle=True)
@@ -61,7 +66,28 @@ if(SHOW_SAMPLES):
         plt.xticks([])
         plt.yticks([])
     plt.show()
-
+def Multiplot(l,xlabel,ylabel,title=''):
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    for p in l:
+        x = p['x']
+        y = p['y']
+        funcName = p['funcName']
+        plt.plot(x,y,label = funcName)
+        plt.legend()
+        plt.title(title)
+        plt.plot()
+    plt.show()
+def freezeFirstLayer(model):
+    for name,param in model.named_parameters():
+        if name in ['conv1.weight','conv1.bias']:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+def initThirdLayer(model):
+    for name,param in model.named_parameters():
+        if name in ['fc1.weight','fc2.weight']:
+            nn.init.xavier_uniform_(param)
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -79,34 +105,61 @@ class Net(nn.Module):
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         return F.log_softmax(x,dim=1)
-def start():
+def Main():
     network = Net()
+    train_losses = []
+    test_losses = []
     #optimizer = optim.SGD(network.parameters(), lr=learning_rate,momentum=momentum)
     optimizer = optim.Adam(network.parameters())
-    test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
-    test(network,valloader_0t6)
-    for epoch in range(1, n_epochs + 1):
-        train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+    #test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
+    print('0-6')
+    if(not LOAD_WEIGHTS_MODEL1):
         test(network,valloader_0t6)
+        for epoch in range(1, n_epochs + 1):
+            train_loss = train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+            test_loss = test(network,valloader_0t6)
+        saveWeights(network,PATH+MODEL1_NAME)
+    else:
+        network = loadWeights(network,PATH+MODEL1_NAME)
+    test(network,valloader_0t6)
+    print('7-9')
+    if(not LOAD_WEIGHTS_MODEL2):
+        freezeFirstLayer(network)
+        initThirdLayer(network)
+        test(network,valloader_7t9)
+        for epoch in range(1, n_epochs + 1):
+            train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+            test(network,valloader_7t9)
+        saveWeights(network,PATH+MODEL2_NAME)
+    else:
+        network = loadWeights(network,PATH+MODEL2_NAME)
+    test(network,valloader_7t9)
+    print('7-9 new weights')
+    network = Net()
+    for epoch in range(1, n_epochs + 1):
+        train(network,optimizer,epoch,trainloader_7t9,valloader_7t9)
+        test(network,valloader_7t9)
+    saveWeights(network,PATH+MODEL2_NAME)
+    test(network,valloader_7t9)
 def train(network,optimizer,epoch,trainloader,valloader):
-  network.train()
-  train_losses = []
-  train_counter = []
-  for batch_idx, (data, target) in enumerate(trainloader):
-    optimizer.zero_grad()
-    output = network(data)
-    loss = F.nll_loss(output, target)
-    loss.backward()
-    optimizer.step()
-    if batch_idx % log_interval == 0:
-      print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        epoch, batch_idx * len(data), len(trainloader.dataset),
-        100. * batch_idx / len(trainloader), loss.item()))
-      train_losses.append(loss.item())
-      train_counter.append(
-        (batch_idx*64) + ((epoch-1)*len(trainloader.dataset)))
-      torch.save(network.state_dict(), 'model1.pth')
-      torch.save(optimizer.state_dict(), 'optimizer.pth')
+    network.train()
+    train_losses = []
+    train_counter = []
+    for batch_idx, (data, target) in enumerate(trainloader):
+        optimizer.zero_grad()
+        output = network(data)
+        loss = F.nll_loss(output, target)
+        loss.backward()
+        optimizer.step()
+        if batch_idx % log_interval == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(trainloader.dataset),
+                100. * batch_idx / len(trainloader), loss.item()))
+            train_losses.append(loss.item())
+    return train_losses
+      #train_counter.append(
+      #  (batch_idx*64) + ((epoch-1)*len(trainloader.dataset)))
+      #torch.save(optimizer.state_dict(), 'optimizer.pth')
 def test(network,testloader):
     network.eval()
     test_loss = 0
@@ -121,5 +174,11 @@ def test(network,testloader):
         test_loss /= len(testloader.dataset)
         test_losses.append(test_loss)
         print(f'\nTest set: Avg. loss: {test_loss}, Accuracy: {correct}/{len(testloader.dataset)} ({100. * correct / len(testloader.dataset)}%')
-
-start()
+    return test_losses
+def loadWeights(new_model,path):
+    new_model.load_state_dict(torch.load(path))
+    return new_model
+def saveWeights(model,path):
+    torch.save(model.state_dict(),path)
+#Start point
+Main()
