@@ -8,7 +8,7 @@ from torch import nn, optim
 import torch.nn.functional as F
 
 SHOW_SAMPLES=False
-LOAD_WEIGHTS = transforms
+LOAD_WEIGHTS = False
 SAVE_WEIGHTS = False
 EPOCHS = 8
 PATH = '/Users/tzvikif/Documents/Msc/Deep Learning/Excercises/ex_2/'
