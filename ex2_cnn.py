@@ -17,6 +17,9 @@ log_interval = 10
 random_seed = 1
 torch.backends.cudnn.enabled = False
 torch.manual_seed(random_seed)
+SHOW_SAMPLES=False
+LOAD_WEIGHTS = False
+SAVE_WEIGHTS = False
 '''
 train_loader = torch.utils.data.DataLoader(
   torchvision.datasets.MNIST('PATH_TO_STORE_TRAINSET', train=True, download=True,transform=torchvision.transforms.Compose([torchvision.transforms.ToTensor(),torchvision.transforms.Normalize((0.1307,), (0.3081,))])),batch_size=batch_size_train, shuffle=True)
@@ -27,29 +30,37 @@ transform = transforms.Compose([transforms.ToTensor(),
                               transforms.Normalize((0.5,), (0.5,)),
                               ])
 
-trainset = datasets.MNIST('PATH_TO_STORE_TRAINSET', download=True, train=True, transform=transform)
-valset = datasets.MNIST('PATH_TO_STORE_TESTSET', download=True, train=False, transform=transform)
-trainset.data = trainset.data[trainset.targets < 7]
-trainset.targets = trainset.targets[trainset.targets < 7]
-valset.data = valset.data[valset.targets < 7]
-valset.targets = valset.targets[valset.targets < 7]
+trainset_0t6 = datasets.MNIST('PATH_TO_STORE_TRAINSET', download=True, train=True, transform=transform)
+valset_0t6 = datasets.MNIST('PATH_TO_STORE_TESTSET', download=True, train=False, transform=transform)
+trainset_0t6.data = trainset_0t6.data[trainset_0t6.targets < 7]
+trainset_0t6.targets = trainset_0t6.targets[trainset_0t6.targets < 7]
+valset_0t6.data = valset_0t6.data[valset_0t6.targets < 7]
+valset_0t6.targets = valset_0t6.targets[valset_0t6.targets < 7]
+trainloader_0t6 = torch.utils.data.DataLoader(trainset_0t6, batch_size=64, shuffle=True)
+valloader_0t6 = torch.utils.data.DataLoader(valset_0t6, batch_size=64, shuffle=True)
 
-train_loader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
-test_loader = torch.utils.data.DataLoader(valset, batch_size=64, shuffle=True)
+trainset_7t9 = datasets.MNIST('PATH_TO_STORE_TRAINSET', download=True, train=True, transform=transform)
+valset_7t9 = datasets.MNIST('PATH_TO_STORE_TESTSET', download=True, train=False, transform=transform)
+trainset_7t9.data = trainset_7t9.data[trainset_7t9.targets > 6]
+trainset_7t9.targets = trainset_7t9.targets[trainset_7t9.targets > 6]
+valset_7t9.data = valset_7t9.data[valset_7t9.targets > 6]
+valset_7t9.targets = valset_7t9.targets[valset_7t9.targets > 6]
+trainloader_7t9 = torch.utils.data.DataLoader(trainset_7t9, batch_size=64, shuffle=True)
+valloader_7t9 = torch.utils.data.DataLoader(valset_7t9, batch_size=64, shuffle=True)
 
 
-examples = enumerate(test_loader)
+examples = enumerate(valloader_0t6)
 batch_idx, (example_data, example_targets) = next(examples)
-
-fig = plt.figure()
-for i in range(6):
-    plt.subplot(2,3,i+1)
-    plt.tight_layout()
-    plt.imshow(example_data[i][0], cmap='gray', interpolation='none')
-    plt.title("Ground Truth: {}".format(example_targets[i]))
-    plt.xticks([])
-    plt.yticks([])
-plt.show()
+if(SHOW_SAMPLES):
+    fig = plt.figure()
+    for i in range(6):
+        plt.subplot(2,3,i+1)
+        plt.tight_layout()
+        plt.imshow(example_data[i][0], cmap='gray', interpolation='none')
+        plt.title("Ground Truth: {}".format(example_targets[i]))
+        plt.xticks([])
+        plt.yticks([])
+    plt.show()
 
 class Net(nn.Module):
     def __init__(self):
@@ -67,20 +78,21 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
-        return F.log_softmax(x)
-
-network = Net()
-optimizer = optim.SGD(network.parameters(), lr=learning_rate,
-                      momentum=momentum)
-    
-train_losses = []
-train_counter = []
-test_losses = []
-test_counter = [i*len(train_loader.dataset) for i in range(n_epochs + 1)]
-
-def train(epoch):
+        return F.log_softmax(x,dim=1)
+def start():
+    network = Net()
+    #optimizer = optim.SGD(network.parameters(), lr=learning_rate,momentum=momentum)
+    optimizer = optim.Adam(network.parameters())
+    test_counter = [i*len(trainloader_0t6.dataset) for i in range(n_epochs + 1)]
+    test(network,valloader_0t6)
+    for epoch in range(1, n_epochs + 1):
+        train(network,optimizer,epoch,trainloader_0t6,valloader_0t6)
+        test(network,valloader_0t6)
+def train(network,optimizer,epoch,trainloader,valloader):
   network.train()
-  for batch_idx, (data, target) in enumerate(train_loader):
+  train_losses = []
+  train_counter = []
+  for batch_idx, (data, target) in enumerate(trainloader):
     optimizer.zero_grad()
     output = network(data)
     loss = F.nll_loss(output, target)
@@ -88,29 +100,26 @@ def train(epoch):
     optimizer.step()
     if batch_idx % log_interval == 0:
       print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        epoch, batch_idx * len(data), len(train_loader.dataset),
-        100. * batch_idx / len(train_loader), loss.item()))
+        epoch, batch_idx * len(data), len(trainloader.dataset),
+        100. * batch_idx / len(trainloader), loss.item()))
       train_losses.append(loss.item())
       train_counter.append(
-        (batch_idx*64) + ((epoch-1)*len(train_loader.dataset)))
-      torch.save(network.state_dict(), 'model.pth')
+        (batch_idx*64) + ((epoch-1)*len(trainloader.dataset)))
+      torch.save(network.state_dict(), 'model1.pth')
       torch.save(optimizer.state_dict(), 'optimizer.pth')
-def test():
+def test(network,testloader):
     network.eval()
     test_loss = 0
     correct = 0
+    test_losses = []
     with torch.no_grad():
-        for data, target in test_loader:
+        for data, target in testloader:
             output = network(data)
             test_loss += F.nll_loss(output, target, size_average=False).item()
-            pred = output.data.max(1, keepdim=True)[1]
-            correct += pred.eq(target.data.view_as(pred)).sum()
-        test_loss /= len(test_loader.dataset)
+            pred = output.data.max(1, keepdim=True)[1]  #shape=[13,1]
+            correct += torch.sum(pred.eq(target.data.view_as(pred)),dim=0)
+        test_loss /= len(testloader.dataset)
         test_losses.append(test_loss)
-        print('\nTest set: Avg. loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
-test()
-for epoch in range(1, n_epochs + 1):
-  train(epoch)
-  test()
+        print(f'\nTest set: Avg. loss: {test_loss}, Accuracy: {correct}/{len(testloader.dataset)} ({100. * correct / len(testloader.dataset)}%')
+
+start()
